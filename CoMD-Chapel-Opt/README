@@ -1,0 +1,77 @@
+This file describes the code for CoMD-Chapel - a Chapel implementation of the CoMD
+molecular dynamics simulation app.
+
+This code is an optimized tuple-based implementation, it uses tuples for
+holding particle information enabling better performance for bulk data transfer
+
+Linked-cell:
+------------
+Like the reference code, this code also uses a linked-cell approach. The problem space
+is divided into fixed number of cells. Each cell maintains a list of its neighbors. The particles 
+within a cell can interact with each other and with the particles in each of the neighboring cells. 
+The force between particles is calculated from their relative positions (using a model of choice, 
+see below) and this force is then used to compute the momentum and thus new particle positions using
+Newtonian mechanics and a leap-frog integration. The problem ends when the specified number of 
+timesteps is reached. A correct solution conserves the total energy (potential + kinetic).
+
+Problem decomposition across locales:
+-------------------------------------
+The simulation space is divided into \emph{domains}. Each domain corresponds to a locale and contains a block of 
+the simulation space on a locale plus a \emph{halo} region surrounding the real cells. The halo cells avoid the
+need to communicate with remote locales during force computation. In each timestep, once the new particle positions
+are calculatedi, each domain does a bulk exchange of halo particles with its neighbors to account for particles that may
+have moved across domain boundaries. The boundary condition used is periodic.
+
+
+Force computation:
+------------------
+The code provides a choice of either Lennard-Jones(LJ) or Embedded atom (EAM) models for force computation. The EAM model 
+involves an additional inter-locale communication. As a performance optimization, the code provides a flag to replicate the 
+force object across all locales after creation (by default force object IS replicated)
+
+The code contains the following files:
+types.chpl    - Contains all the typedefs
+configs.chpl  - Contains all config and param variables
+setup.chpl    - Contains the definition of the domain and linked-cell (box) data structures
+force.chpl    - Base class for the force models
+forcelj.chpl  - LJ model implementation
+forceeam.chpl - EAM model implementation
+helpers.chpl  - Utility functions
+MD.chpl       - main file (contains timestep loop)
+random.{h,c}  - C code for random number generator
+pots          - directory containing potential files (only used for EAM)
+Makefile      - to make the code
+README        - this file
+
+Environment:
+-------------
+Some environment variables need to be set in order to correctly compile the code for a given
+platform. e.g. the following variables are set to configure a 64-bit Linux machine using the
+gasnet infiniband conduit for inter-locale communication.
+IMPORTANT: Set these variables before compiling the Chapel compiler itself
+export MPI_CC=<PATH-TO-MPI>/bin/mpicc
+export MPI_LIBS=<PATH-TO-MPI>/lib
+export CHPL_HOST_PLATFORM=linux64
+export CHPL_TARGET_PLATFORM=linux64
+export CHPL_TARGET_ARCH=native
+export CHPL_COMM=gasnet
+export CHPL_COMM_SUBSTRATE=ibv
+export CHPL_GASNET_SEGMENT=large
+export CHPL_VER=chapel-1.13.0
+export CHPL_HOME=<CHPL-DIRECTORY>/$CHPL_VER
+
+Also set the path as follows
+
+export PATH=$PATH:$CHPL_HOME/bin/$CHPL_TARGET_PLATFORM/
+export PATH=$PATH:$CHPL_HOME/util
+export PATH=$PATH:$CHPL_HOME/tools/chplvis
+export MANPATH=$MANPATH:$CHPL_HOME/man
+
+To compile:
+-----------
+In the same folder as this README file type make
+
+To run:
+-------
+Run the md_real file with the desired number of locales.
+Run with --help to get all a list of the configurable parameters
