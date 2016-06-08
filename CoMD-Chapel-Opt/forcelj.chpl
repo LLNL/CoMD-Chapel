@@ -67,7 +67,7 @@ if useChplVis then tagVdebug("computeLJForce");
             for i in 1..box(1) {
               var fi:real3, pi:real;
               for j in 1..nBox(1) {
-                force.compute(box(2)(i)(5), nBox(2)(j)(5), fi, pi);
+                force.compute(box(2)(i).r, nBox(2)(j).r, fi, pi);
               }
               f(i)  += fi;
               pe(i) += pi;
@@ -98,7 +98,7 @@ local {
             for i in 1..box(1) {
               var fi:real3, pi:real;
               for j in 1..nBox(1) {
-                force.compute(box(2)(i)(5), nBox(2)(j)(5), fi, pi);
+                force.compute(box(2)(i).r, nBox(2)(j).r, fi, pi);
               }
               f(i)  += fi;
               pe(i) += pi;

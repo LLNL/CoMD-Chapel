@@ -129,7 +129,7 @@ local {
       forall box in MyDom.cells[MyDom.localDom] with (+ reduce vcmTemp) {
         for i in 1..box(1) {
           const ref atom = box(2)[i];
-          vcmTemp += atom(6);
+          vcmTemp += atom.v;
         }
       }
       MyDom.vcmTemp = vcmTemp;
@@ -155,7 +155,7 @@ local {
       forall box in MyDom.cells[MyDom.localDom] {
         for i in 1..box(1) {
           ref atom = box(2)[i];
-          atom(6) += vShift;
+          atom.v += vShift;
         }
       }
 }
@@ -175,7 +175,7 @@ local {
       forall (box, pe) in zip(MyDom.cells[MyDom.localDom], MyDom.pe) with (+ reduce keTemp, + reduce peTemp) {
         for i in 1..box(1) {
           const ref atom = box(2)[i];
-          keTemp += 0.5 * atom(2) * dot(atom(6), atom(6));
+          keTemp += 0.5 * atom.mass * dot(atom.v, atom.v);
           peTemp += pe[i];
         }
       }
@@ -202,9 +202,9 @@ local {
       forall box in MyDom.cells[MyDom.localDom] {
         for i in 1..box(1) {
           ref atom = box(2)[i];
-		  var sigma : real = sqrt(kB_eV * temp/atom(2));
-		  var seed : uint(64) = mkSeed((atom(1)-1) : uint(32), 123);
-		  atom(6) = (sigma * gasdev(seed), sigma * gasdev(seed), sigma * gasdev(seed));
+		  var sigma : real = sqrt(kB_eV * temp/atom.mass);
+		  var seed : uint(64) = mkSeed((atom.gid-1) : uint(32), 123);
+		  atom.v = (sigma * gasdev(seed), sigma * gasdev(seed), sigma * gasdev(seed));
         }
       }
 }
@@ -229,7 +229,7 @@ local {
       forall box in MyDom.cells[MyDom.localDom] {
         for i in 1..box(1) {
           ref atom = box(2)[i];
-		  atom(6) *= scaleFactor;
+		  atom.v *= scaleFactor;
         }
       }
 }
@@ -248,8 +248,8 @@ local {
       forall box in MyDom.cells[MyDom.localDom] {
         for i in 1..box(1) {
           ref atom = box(2)[i];
-          var seed : uint(64) = mkSeed((atom(1)-1) : uint(32), 457);
-          atom(5) += (2.0*lcg61(seed)-1.0) * delta;
+          var seed : uint(64) = mkSeed((atom.gid-1) : uint(32), 457);
+          atom.r += (2.0*lcg61(seed)-1.0) * delta;
         }
       }
 }
@@ -316,7 +316,7 @@ local {
       //for (box, boxIdx) in zip(MyDom.locCells, MyDom.localDom) {
         var ii : int(32) = 1;
         while (ii <= box(1)) {
-          var pos = box(2)[ii](5);
+          var pos = box(2)[ii].r;
           var dBoxIdx : int3 = getBoxFromCoords(pos, invBoxSize);
 
           // if another box
@@ -362,7 +362,7 @@ inline proc gatherAtoms(const ref MyDom:Domain, const in face : int) : int(32) {
       for i in 1..sBox(1) {
         count += 1;
         dBox(2)[count] = sBox(2)[i];
-        dBox(2)[count](5) += MyDom.pbc[face];
+        dBox(2)[count].r += MyDom.pbc[face];
       }
       if(MyDom.localDom.member(dBoxIdx)) then numLocalAtoms += sBox(1); 
     }
@@ -376,48 +376,14 @@ inline proc haloExchange(const ref MyDom : Domain, const in face:int) {
   var faceArr => MyDom.temps1[face].a;
   const nf = neighs[face];
 
-  const dLocale = here.id;
-  const dLen    = faceArr.domain.numIndices.safeCast(size_t);
-  const dIndex  = faceArr._value.getDataIndex(faceArr.domain.low);
-  const dArr    = faceArr._value.theData;
-  const dData   = _ddata_shift(faceArr._value.eltType, dArr, dIndex);
-
   on locGrid[nf] {
     const g = Grid[nf];
     const sf = src;
-    var gTmp => g.temps2[face].a;
-    if useChplVis then const g0 = Grid[(0,0,0)];
-    local {
-      // copy to local buffer
-      gTmp._value.doiBulkTransferStride(g.cells[sf]._value);
-    }
-    if useChplVis then const g0 = Grid[(0,0,0)];
+    faceArr = g.cells[sf];
     local {
       // indicate to the neighbor that read is done
       if(face % 2) then g.nP$.writeXF(true); else g.nM$.writeXF(true);
     }
-    if useChplVis then const g0 = Grid[(0,0,0)]; // chplvis marker
-
-    // copy to remote buffer
-    // This works too
-    //faceArr._value.doiBulkTransfer(gTmp);
-
-    const sArr = gTmp._value.theData;
-    const sIndex  = gTmp._value.getDataIndex(gTmp.domain.low);
-    const sData = _ddata_shift(gTmp._value.eltType, sArr, sIndex);
-
-    __primitive("chpl_comm_array_put", sData[0], dLocale, dData[0], dLen); 
-
-    // This works too (_ddata_shift not required, in that case)
-    // Had to change chpl_comm_put to chpl_comm_array_put from v1.12 to v1.13
-/*
-    __primitive("chpl_comm_array_put",
-                __primitive("array_get", sArr, sIndex),
-                dLocale,
-                __primitive("array_get", dArr, dIndex),
-                dLen);
-*/
-    if useChplVis then const g2 = Grid[(0,0,0)];  // chplvis marker
   }
 }
 
@@ -606,7 +572,7 @@ local {
               // assert(MyDom.cells[box].count < MAXATOMS);
 
               MyDom.cells[box](1) += 1;
-              MyDom.cells[box](2)[MyDom.cells[box](1)] = (gid, mass, 1 : int(32), name, (rx, ry, rz), (0.0,0.0,0.0));
+              MyDom.cells[box](2)[MyDom.cells[box](1)] = new Atom(gid, mass, 1 : int(32), (rx, ry, rz));
               if(MyDom.localDom.member(box)) then MyDom.numLocalAtoms += 1; 
 
             }
@@ -662,7 +628,7 @@ local {
       forall (box, f) in zip(MyDom.cells[MyDom.localDom], MyDom.f) {
         for i in 1..box(1) {
           ref a = box(2)(i);
-          a(6) += ((dt/a(2))*f(i));
+          a.v += ((dt/a.mass)*f(i));
         }
       }
 }
@@ -682,7 +648,7 @@ local {
       forall box in MyDom.cells[MyDom.localDom] {
         for i in 1..box(1) {
           ref a = box(2)(i);
-          a(5) += (dt*a(6));
+          a.r += (dt*a.v);
         }
       }
 }
