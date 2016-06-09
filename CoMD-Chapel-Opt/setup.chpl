@@ -12,25 +12,20 @@ var boxSize   : real3; // size of link cell
 var numBoxes  : int3;  // number of link cells
 
 // atom
-/*
 record Atom {
   var gid  : int(32);
   var mass : real;
   var species : int(32);
-  var name : string;
   var r : real3;
   var v : real3;
 }
-*/
-
-type Atom = (int(32), real, int(32), string, real3, real3);
 
 inline proc >(const ref a : Atom, const ref b : Atom) : bool {
-  return a(1) > b(1);
+  return a.gid > b.gid;
 }
 
 inline proc <(const ref a : Atom, const ref b : Atom) : bool {
-  return a(1) < b(1);
+  return a.gid < b.gid;
 }
 
 inline proc <=(const ref a : Atom, const ref b : Atom) : bool {

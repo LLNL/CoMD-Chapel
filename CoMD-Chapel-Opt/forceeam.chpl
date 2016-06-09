@@ -42,7 +42,7 @@ class InterpolationObject {
     // reset r to fractional distance
     r = r - floor(r);
 
-    var v : (real, real, real, real);
+    var v : 4*real;
     for i in -1..2 do v(i+2) = values(ii+i);
 
     const g1 : real = v(3) - v(1);
@@ -369,7 +369,7 @@ if useChplVis then tagVdebug("computeEAMForce");
             for i in 1..box(1) {
               var fij:real3, pij:real, rij:real;
               for j in 1..nBox(1) {
-                force.compute1(box(2)(i)(5), nBox(2)(j)(5), fij, pij, rij);
+                force.compute1(box(2)(i).r, nBox(2)(j).r, fij, pij, rij);
               }
               f(i) -= fij;
               pe(i) += pij;
@@ -405,7 +405,7 @@ if useChplVis then tagVdebug("computeEAMForce");
             for i in 1..box(1) {
               var fij:real3;
               for j in 1..nBox(1) {
-                force.compute2(box(2)(i)(5), nBox(2)(j)(5), dfEmbed(i)+nDfEmbed(j), fij);
+                force.compute2(box(2)(i).r, nBox(2)(j).r, dfEmbed(i)+nDfEmbed(j), fij);
               }
               f(i) -= fij;
             }
@@ -440,7 +440,7 @@ local {
             for i in 1..box(1) {
               var fij:real3, pij:real, rij:real;
               for j in 1..nBox(1) {
-                force.compute1(box(2)(i)(5), nBox(2)(j)(5), fij, pij, rij);
+                force.compute1(box(2)(i).r, nBox(2)(j).r, fij, pij, rij);
               }
               f(i) -= fij;
               pe(i) += pij;
@@ -478,7 +478,7 @@ local {
             for i in 1..box(1) {
               var fij:real3;
               for j in 1..nBox(1) {
-                force.compute2(box(2)(i)(5), nBox(2)(j)(5), dfEmbed(i)+nDfEmbed(j), fij);
+                force.compute2(box(2)(i).r, nBox(2)(j).r, dfEmbed(i)+nDfEmbed(j), fij);
               }
               f(i) -= fij;
             }
