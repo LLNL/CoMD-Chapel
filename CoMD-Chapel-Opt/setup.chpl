@@ -67,6 +67,10 @@ class Domain {
   var neighs         : [neighDom] int3;                    // neighbors on each face (xm, xp, ym, yp, zm, zp)
   var temps1         : [neighDom] FaceArr;                 // temp arrays for each face (xm, xp, ym, yp, zm, zp)
   var temps2         : [neighDom] FaceArr;                 // temp arrays for each face (xm, xp, ym, yp, zm, zp)
+  var bufDom         : domain(1);                          // Domain for buffer size, set during grid initialization
+  var recvBuf,                                             // Each face gets a receive buffer for haloExchange
+      packBuf        : [neighDom] [bufDom] Atom;           // Each face gets a local packing buffer for haloExchange
+  var recvSize       : [neighDom] int;
   var srcSlice       : [neighDom] domain(3);               // src (remote) slice for each face (xm, xp, ym, yp, zm, zp)
   var destSlice      : [neighDom] domain(3);               // dest (local) slice for each face (xm, xp, ym, yp, zm, zp)
   var pbc            : [neighDom] real3;                   // periodic boundary shift for each face (xm, xp, ym, yp, zm, zp)
