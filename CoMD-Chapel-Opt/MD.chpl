@@ -72,8 +72,8 @@ local {
       var srcSlice => MyDom.srcSlice;
       var neighs => MyDom.neighs;
       const neighDom => MyDom.neighDom;
-      var temps1 => MyDom.temps1;
-      var temps2 => MyDom.temps2;
+      var bRecv => MyDom.bRecv;
+      var bSend => MyDom.bSend;
       var pbc => MyDom.pbc;
  
       var neighOff : [neighDom] int3;
@@ -84,32 +84,27 @@ local {
       neighOff[5] = (0,0,-1);
       neighOff[6] = (0,0,1);
 
-      for (dest, src, t1, t2, shift, neigh, nOff) in zip(destSlice, srcSlice, temps1, temps2, pbc, neighs, neighOff) {
+      for (dest, src, recv, send, shift, neigh, nOff) in zip(destSlice, srcSlice, bRecv, bSend, pbc, neighs, neighOff) {
         dest = halo.interior(2*nOff);
+        const bC = dest.size;
         src = dest;
         var neighbor = ijk + nOff;
         var srcOff = (0,0,0);
-        t1 = new FaceArr(d=dest);
+        recv = new FaceArr(d=bC);
+        send = new FaceArr(d=bC);
         for i in 1..3 {
           if(neighbor(i) < 0) {
-            //neighbor(i) = locDom.high(i);
-            //srcOff(i) = boxSpace.high(i);
-            //shift(i) = -1.0*simSize(i);
             neighbor(i) = lDh(i);
             srcOff(i) = bSh(i);
             shift(i) = -1.0*sS(i);
           }
-          //else if(neighbor(i) > locDom.high(i)) {
           else if(neighbor(i) > lDh(i)) {
             neighbor(i) = 0;
             srcOff(i) = -bSh(i);
             shift(i) = 1.0*sS(i);
-            //srcOff(i) = -boxSpace.high(i);
-            //shift(i) = 1.0*simSize(i);
           }
         }
         src = src.translate(srcOff);
-        t2 = new FaceArr(d=src);
         neigh = neighbor;
       }
 }
@@ -347,43 +342,71 @@ local {
 }
 
 inline proc gatherAtoms(const ref MyDom:Domain, const in face : int) : int(32) {
-  local {
+local {
     const dest => MyDom.destSlice; 
     var numLocalAtoms : int(32) = 0;
 
     // wait for the neighbor to finish its read
     if(face % 2) then MyDom.nM$; else MyDom.nP$;
-    var faceArr => MyDom.temps1[face].a;
+    var faceArr => MyDom.bRecv[face].a;
+    var faceCount = MyDom.bRecv[face].count;
 
-    forall (dBox, sBox, dBoxIdx) in zip(MyDom.cells[dest[face]], faceArr, faceArr.domain) with (+ reduce numLocalAtoms) {
-      var count = dBox(1);
-      dBox(1) += sBox(1);
-      // assert(dBox.count <= MAXATOMS);
-      for i in 1..sBox(1) {
-        count += 1;
-        dBox(2)[count] = sBox(2)[i];
-        dBox(2)[count].r += MyDom.pbc[face];
-      }
-      if(MyDom.localDom.member(dBoxIdx)) then numLocalAtoms += sBox(1); 
+    const invBoxSize = MyDom.invBoxSize;
+    const pbc = MyDom.pbc[face];
+
+    for atom in faceArr[1..faceCount] {
+      const box : int3 = getBoxFromCoords(atom.r+pbc, invBoxSize);
+      ref dBox = MyDom.cells[box];
+      dBox(1) += 1;
+      const count = dBox(1);
+      dBox(2)[count] = atom;
+      dBox(2)[count].r += pbc;
+      if(MyDom.localDom.member(box)) then numLocalAtoms += 1; 
     }
     return numLocalAtoms;
-  }
+}
 }
 
 inline proc haloExchange(const ref MyDom : Domain, const in face:int) {
   const src = MyDom.srcSlice[face];
   const neighs => MyDom.neighs;
-  var faceArr => MyDom.temps1[face].a;
+  var faceArr => MyDom.bRecv[face].a;
+  ref faceCount = MyDom.bRecv[face].count;
   const nf = neighs[face];
-
+/* 
+  const dLocale = here.id;
+  const dLen    = faceArr.domain.numIndices.safeCast(size_t);
+  const dIndex  = faceArr._value.getDataIndex(faceArr.domain.low);
+  const dArr    = faceArr._value.theData;
+  const dData   = _ddata_shift(faceArr._value.eltType, dArr, dIndex);
+*/
   on locGrid[nf] {
     const g = Grid[nf];
     const sf = src;
-    faceArr = g.cells[sf];
-    local {
+    var gFaceArr => g.bSend[face].a;
+    var gFaceCount = 0;
+local {
+    for box in g.cells[sf] {
+      for i in 1..box(1) {
+        gFaceCount += 1;
+        ref a = box(2)(i);
+        gFaceArr[gFaceCount] = a;
+      }
+    }
+}
+    faceCount = gFaceCount;
+    faceArr[1..gFaceCount] = gFaceArr[1..gFaceCount];
+/* 
+    const sArr = gFaceArr._value.theData;
+    const sIndex  = gFaceArr._value.getDataIndex(gFaceArr.domain.low);
+    const sData = _ddata_shift(gFaceArr._value.eltType, sArr, sIndex);
+    __primitive("chpl_comm_array_put", sData[0], dLocale, dData[0], dLen); 
+*/ 
+
+local {
       // indicate to the neighbor that read is done
       if(face % 2) then g.nP$.writeXF(true); else g.nM$.writeXF(true);
-    }
+}
   }
 }
 

@@ -51,8 +51,9 @@ record Box {
 type Box = (int(32), AtomList);
 
 class FaceArr {
-  var d : domain(3);
-  var a : [d] Box;
+  var count = 0;
+  var d : int;
+  var a : [1..MAXATOMS*d] Atom;
 }
 
 // locale's domain of link cells
@@ -65,10 +66,10 @@ class Domain {
   var neighDom       : domain(1) = {1..6};                 // domain of neighbors on each face (xm, xp, ym, yp, zm, zp)
   var nM$, nP$       : sync bool;                          // sync updates to neighbors for each face pair (xm/xp, ym/yp, zm/zp)
   var neighs         : [neighDom] int3;                    // neighbors on each face (xm, xp, ym, yp, zm, zp)
-  var temps1         : [neighDom] FaceArr;                 // temp arrays for each face (xm, xp, ym, yp, zm, zp)
-  var temps2         : [neighDom] FaceArr;                 // temp arrays for each face (xm, xp, ym, yp, zm, zp)
-  var srcSlice       : [neighDom] domain(3);               // src (remote) slice for each face (xm, xp, ym, yp, zm, zp)
+  var bRecv          : [neighDom] FaceArr;                 // temp arrays for each face (xm, xp, ym, yp, zm, zp)
+  var bSend          : [neighDom] FaceArr;                 // temp arrays for each face (xm, xp, ym, yp, zm, zp)
   var destSlice      : [neighDom] domain(3);               // dest (local) slice for each face (xm, xp, ym, yp, zm, zp)
+  var srcSlice       : [neighDom] domain(3);               // src (remote) slice for each face (xm, xp, ym, yp, zm, zp)
   var pbc            : [neighDom] real3;                   // periodic boundary shift for each face (xm, xp, ym, yp, zm, zp)
 
   var numLocalAtoms  : int(32);                            // number of atoms on this domain
