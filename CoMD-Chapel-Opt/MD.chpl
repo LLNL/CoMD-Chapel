@@ -75,6 +75,13 @@ local {
       var temps1 => MyDom.temps1;
       var temps2 => MyDom.temps2;
       var pbc => MyDom.pbc;
+      {
+        const size0 = halo.dim(2).size * halo.dim(3).size;
+        const size1 = halo.dim(1).size * halo.dim(3).size;
+        const size2 = halo.dim(1).size * halo.dim(2).size;
+        const maxSize = max(size0, size1, size2);
+        MyDom.bufDom = {1..maxSize*2*MAXATOMS};
+      }
  
       var neighOff : [neighDom] int3;
       neighOff[1] = (-1,0,0);
@@ -99,7 +106,6 @@ local {
             srcOff(i) = bSh(i);
             shift(i) = -1.0*sS(i);
           }
-          //else if(neighbor(i) > locDom.high(i)) {
           else if(neighbor(i) > lDh(i)) {
             neighbor(i) = 0;
             srcOff(i) = -bSh(i);
@@ -346,50 +352,65 @@ local {
   }
 }
 
-inline proc gatherAtoms(const ref MyDom:Domain, const in face : int) : int(32) {
+proc gatherAtoms(const ref MyDom:Domain, const in face : int) : int(32) {
+  // haloExchange finished sending its data over, wait until another
+  // locale fills our recvBuf.
+  if face % 2 then MyDom.nM$; else MyDom.nP$;
+  var numLocalAtoms : int(32) = 0;
   local {
-    const dest => MyDom.destSlice; 
-    var numLocalAtoms : int(32) = 0;
-
-    // wait for the neighbor to finish its read
-    if(face % 2) then MyDom.nM$; else MyDom.nP$;
-    var faceArr => MyDom.temps1[face].a;
-
-    forall (dBox, sBox, dBoxIdx) in zip(MyDom.cells[dest[face]], faceArr, faceArr.domain) with (+ reduce numLocalAtoms) {
-      var count = dBox(1);
-      dBox(1) += sBox(1);
-      // assert(dBox.count <= MAXATOMS);
-      for i in 1..sBox(1) {
-        count += 1;
-        dBox(2)[count] = sBox(2)[i];
-        dBox(2)[count].r += MyDom.pbc[face];
-      }
-      if(MyDom.localDom.member(dBoxIdx)) then numLocalAtoms += sBox(1); 
+    ref recv = MyDom.recvBuf[face][1..MyDom.recvSize[face]];
+    for a in recv {
+      a.r += MyDom.pbc[face];
+      var idx = getBoxFromCoords(a.r, MyDom.invBoxSize);
+      ref box = MyDom.cells[idx];
+      //assert(MyDom.halo.member(idx), MyDom.halo, " vs. ", idx);
+      ref count = box(1);
+      count += 1;
+      box(2)[count] = a;
+      if MyDom.localDom.member(idx) then numLocalAtoms += 1;
     }
-    return numLocalAtoms;
   }
+  return numLocalAtoms;
 }
 
-inline proc haloExchange(const ref MyDom : Domain, const in face:int) {
-  const src = MyDom.srcSlice[face];
+proc haloExchange(const ref MyDom : Domain, const in face:int) {
+  const src = MyDom.destSlice[face];
   const neighs => MyDom.neighs;
   var faceArr => MyDom.temps1[face].a;
   const nf = neighs[face];
+  ref pack = MyDom.packBuf[face];
+  const target = if face % 2 == 0 then face-1 else face+1;
 
-  on locGrid[nf] {
-    const g = Grid[nf];
-    const sf = src;
-    faceArr = g.cells[sf];
-    local {
-      // indicate to the neighbor that read is done
-      if(face % 2) then g.nP$.writeXF(true); else g.nM$.writeXF(true);
+  var counter = 1;
+  local {
+    for box in MyDom.cells[src] {
+      for i in 1..box(1) {
+        ref slot = pack[counter];
+        slot = box(2)(i);
+        counter += 1;
+      }
     }
+    // counter now points to the next empty slot in our buffer.
+    // subtract one to get the total number of atoms being sent.
+    counter -= 1;
+  }
+
+  const g = Grid[nf];
+  ref actualPack = pack[1..counter];
+  
+  // TODO: put 'counter' into a const to avoid communication
+  on locGrid[nf] {
+    g.recvBuf[target][1..counter] = actualPack;
+    g.recvSize[target] = counter;
+
+    // Tell the destination locale that its recvBuf is full
+    if face % 2 then g.nP$.writeXF(true); else g.nM$.writeXF(true);
   }
 }
 
 // if only one cells in this dimension, then read in parallel
 // but add atoms serially
-inline proc exchangeData(const ref MyDom:Domain, const in i : int) {
+proc exchangeData(const ref MyDom:Domain, const in i : int) {
   var nAtoms : int(32) = 0;
   cobegin {
     { haloExchange(MyDom, i); }
@@ -402,13 +423,19 @@ inline proc exchangeData(const ref MyDom:Domain, const in i : int) {
 
 // if 2 or more cells in this dimension, then read 
 // and add atoms in parallel
-inline proc exchangeData(const ref MyDom:Domain, const in i : int) 
+proc exchangeData(const ref MyDom:Domain, const in i : int) 
             where MyDom.localDom.dim((i/2):int+1).size > 1 {
   var nAtomsM : int(32) = 0;
   var nAtomsP : int(32) = 0;
   cobegin with (ref nAtomsM, ref nAtomsP) {
-    { haloExchange(MyDom, i); nAtomsM = gatherAtoms(MyDom, i); }
-    { haloExchange(MyDom, i+1); nAtomsP = gatherAtoms(MyDom, i+1); }
+    {
+      haloExchange(MyDom, i); 
+      nAtomsM = gatherAtoms(MyDom, i);
+    }
+    { 
+      haloExchange(MyDom, i+1); 
+      nAtomsP = gatherAtoms(MyDom, i+1);
+    }
   }
   MyDom.numLocalAtoms += (nAtomsM + nAtomsP);
 }
@@ -520,7 +547,8 @@ tArray[timerEnum.F1].stop();
   writeln(yyyymmdd(1), "-", yyyymmdd(2), "-", yyyymmdd(3), ", ", getCurrentTime(TimeUnits.hours), " Initialization Finished");
 }
 
-inline proc getBoxFromCoords(const in r : real3, const in invBoxSize: real3) {
+// TODO: const ref these...
+inline proc getBoxFromCoords(const ref r : real3, const ref invBoxSize: real3) {
   var boxCoords : int3;
   const temp = r * invBoxSize + (1,1,1);
 
@@ -623,6 +651,7 @@ tArray[timerEnum.VELOCITY].start();
 if useChplVis then tagVdebug("advanceVelocity");
   coforall ijk in locDom {
     on locGrid[ijk] {
+      // TODO: Some communication when accessing our Domain class
       const MyDom = Grid[ijk];
 local {
       forall (box, f) in zip(MyDom.cells[MyDom.localDom], MyDom.f) {
