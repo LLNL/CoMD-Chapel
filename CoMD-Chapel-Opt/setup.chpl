@@ -41,14 +41,10 @@ type FList = MAXATOMS*real3;
 type PList = MAXATOMS*real;
 
 // link cell
-/*
 record Box {
   var count : int(32);
   var atoms : AtomList;
 }
-*/
-
-type Box = (int(32), AtomList);
 
 class FaceArr {
   var d : domain(3);

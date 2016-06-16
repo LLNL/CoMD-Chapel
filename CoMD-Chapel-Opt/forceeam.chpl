@@ -358,7 +358,7 @@ if useChplVis then tagVdebug("computeEAMForce");
         const force = MyDom.force : ForceEAM;
         const neighs = {-1..1, -1..1, -1..1};
         coforall (box, f, pe, dfEmbed, rhoBar, boxIdx) in zip(MyDom.cells[MyDom.localDom], MyDom.f, MyDom.pe, MyEAMDom.dfEmbed[MyDom.localDom], MyEAMDom.rhoBar[MyDom.localDom], MyDom.localDom) {
-          for i in 1..box(1) {
+          for i in 1..box.count {
             f(i)  = (0.0, 0.0, 0.0);
             pe(i) = 0.0;
             rhoBar(i) = 0.0;
@@ -366,10 +366,10 @@ if useChplVis then tagVdebug("computeEAMForce");
 
           for n in neighs {
             const ref nBox = MyDom.cells[boxIdx + n];
-            for i in 1..box(1) {
+            for i in 1..box.count {
               var fij:real3, pij:real, rij:real;
-              for j in 1..nBox(1) {
-                force.compute1(box(2)(i).r, nBox(2)(j).r, fij, pij, rij);
+              for j in 1..nBox.count {
+                force.compute1(box.atoms(i).r, nBox.atoms(j).r, fij, pij, rij);
               }
               f(i) -= fij;
               pe(i) += pij;
@@ -377,7 +377,7 @@ if useChplVis then tagVdebug("computeEAMForce");
             }
           }
 
-          for i in 1..box(1) {
+          for i in 1..box.count {
             var fEmbedTmp, dfEmbedTmp:real; force.fIO.interpolate(rhoBar(i), fEmbedTmp, dfEmbedTmp);
             dfEmbed(i) = dfEmbedTmp;
             pe(i) += fEmbedTmp;
@@ -402,10 +402,10 @@ if useChplVis then tagVdebug("computeEAMForce");
           for n in neighs {
             const ref nBox = MyDom.cells[boxIdx + n];
             const ref nDfEmbed = MyEAMDom.dfEmbed[boxIdx + n];
-            for i in 1..box(1) {
+            for i in 1..box.count {
               var fij:real3;
-              for j in 1..nBox(1) {
-                force.compute2(box(2)(i).r, nBox(2)(j).r, dfEmbed(i)+nDfEmbed(j), fij);
+              for j in 1..nBox.count {
+                force.compute2(box.atoms(i).r, nBox.atoms(j).r, dfEmbed(i)+nDfEmbed(j), fij);
               }
               f(i) -= fij;
             }
@@ -429,7 +429,7 @@ if useChplVis then tagVdebug("computeEAMForce");
 local {
         const neighs = {-1..1, -1..1, -1..1};
         coforall (box, f, pe, dfEmbed, rhoBar, boxIdx) in zip(MyDom.cells[MyDom.localDom], MyDom.f, MyDom.pe, MyEAMDom.dfEmbed[MyDom.localDom], MyEAMDom.rhoBar[MyDom.localDom], MyDom.localDom) {
-          for i in 1..box(1) {
+          for i in 1..box.count {
             f(i)  = (0.0, 0.0, 0.0);
             pe(i) = 0.0;
             rhoBar(i) = 0.0;
@@ -437,10 +437,10 @@ local {
 
           for n in neighs {
             const ref nBox = MyDom.cells[boxIdx + n];
-            for i in 1..box(1) {
+            for i in 1..box.count {
               var fij:real3, pij:real, rij:real;
-              for j in 1..nBox(1) {
-                force.compute1(box(2)(i).r, nBox(2)(j).r, fij, pij, rij);
+              for j in 1..nBox.count {
+                force.compute1(box.atoms(i).r, nBox.atoms(j).r, fij, pij, rij);
               }
               f(i) -= fij;
               pe(i) += pij;
@@ -448,7 +448,7 @@ local {
             }
           }
 
-          for i in 1..box(1) {
+          for i in 1..box.count {
             var fEmbedTmp, dfEmbedTmp:real; force.fIO.interpolate(rhoBar(i), fEmbedTmp, dfEmbedTmp);
             dfEmbed(i) = dfEmbedTmp;
             pe(i) += fEmbedTmp;
@@ -475,10 +475,10 @@ local {
           for n in neighs {
             const ref nBox = MyDom.cells[boxIdx + n];
             const ref nDfEmbed = MyEAMDom.dfEmbed[boxIdx + n];
-            for i in 1..box(1) {
+            for i in 1..box.count {
               var fij:real3;
-              for j in 1..nBox(1) {
-                force.compute2(box(2)(i).r, nBox(2)(j).r, dfEmbed(i)+nDfEmbed(j), fij);
+              for j in 1..nBox.count {
+                force.compute2(box.atoms(i).r, nBox.atoms(j).r, dfEmbed(i)+nDfEmbed(j), fij);
               }
               f(i) -= fij;
             }

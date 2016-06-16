@@ -133,8 +133,8 @@ tArray[timerEnum.COMMREDUCE].start();
       const MyDom = Grid[ijk];
 local {
       forall box in MyDom.cells[MyDom.localDom] with (+ reduce vcmTemp) {
-        for i in 1..box(1) {
-          const ref atom = box(2)[i];
+        for i in 1..box.count {
+          const ref atom = box.atoms[i];
           vcmTemp += atom.v;
         }
       }
@@ -159,8 +159,8 @@ proc setVcm(newVcm : real3) {
       const MyDom = Grid[ijk];
 local {
       forall box in MyDom.cells[MyDom.localDom] {
-        for i in 1..box(1) {
-          ref atom = box(2)[i];
+        for i in 1..box.count {
+          ref atom = box.atoms[i];
           atom.v += vShift;
         }
       }
@@ -179,8 +179,8 @@ local {
       var keTemp = 0.0;
       var peTemp = 0.0;
       forall (box, pe) in zip(MyDom.cells[MyDom.localDom], MyDom.pe) with (+ reduce keTemp, + reduce peTemp) {
-        for i in 1..box(1) {
-          const ref atom = box(2)[i];
+        for i in 1..box.count {
+          const ref atom = box.atoms[i];
           keTemp += 0.5 * atom.mass * dot(atom.v, atom.v);
           peTemp += pe[i];
         }
@@ -206,8 +206,8 @@ proc setTemperature(const in temp : real) : void {
       const MyDom = Grid[ijk];
 local {
       forall box in MyDom.cells[MyDom.localDom] {
-        for i in 1..box(1) {
-          ref atom = box(2)[i];
+        for i in 1..box.count {
+          ref atom = box.atoms[i];
 		  var sigma : real = sqrt(kB_eV * temp/atom.mass);
 		  var seed : uint(64) = mkSeed((atom.gid-1) : uint(32), 123);
 		  atom.v = (sigma * gasdev(seed), sigma * gasdev(seed), sigma * gasdev(seed));
@@ -233,8 +233,8 @@ local {
       const MyDom = Grid[ijk];
 local {
       forall box in MyDom.cells[MyDom.localDom] {
-        for i in 1..box(1) {
-          ref atom = box(2)[i];
+        for i in 1..box.count {
+          ref atom = box.atoms[i];
 		  atom.v *= scaleFactor;
         }
       }
@@ -252,8 +252,8 @@ proc randomDisplacements(temp : real) : void {
       const MyDom = Grid[ijk];
 local {
       forall box in MyDom.cells[MyDom.localDom] {
-        for i in 1..box(1) {
-          ref atom = box(2)[i];
+        for i in 1..box.count {
+          ref atom = box.atoms[i];
           var seed : uint(64) = mkSeed((atom.gid-1) : uint(32), 457);
           atom.r += (2.0*lcg61(seed)-1.0) * delta;
         }
@@ -275,14 +275,14 @@ local {
           //InsertionSort(box.atoms[1..box.count]);
           //BubbleSort(box.atoms[1..box.count]);
 ///*
-          for i in 2..box(1) {
-            const x = box(2)[i];
+          for i in 2..box.count {
+            const x = box.atoms[i];
             var j = i-1;
-            while (j >= 1 && box(2)[j] > x) {
-              box(2)[j+1] <=> box(2)[j];
+            while (j >= 1 && box.atoms[j] > x) {
+              box.atoms[j+1] <=> box.atoms[j];
               j -= 1;
             }
-            box(2)[j+1] = x;
+            box.atoms[j+1] = x;
           }
 //*/
         }
@@ -314,15 +314,15 @@ local {
       // empty halo cells
       for nOff in neighOff {
         var h = halo.interior(1*nOff);
-        forall box in MyDom.cells[h] do box(1) = 0;
+        forall box in MyDom.cells[h] do box.count = 0;
       }
 
       // move atoms locally
       for (box, boxIdx) in zip(MyDom.cells[MyDom.localDom], MyDom.localDom) {
       //for (box, boxIdx) in zip(MyDom.locCells, MyDom.localDom) {
         var ii : int(32) = 1;
-        while (ii <= box(1)) {
-          var pos = box(2)[ii].r;
+        while (ii <= box.count) {
+          var pos = box.atoms[ii].r;
           var dBoxIdx : int3 = getBoxFromCoords(pos, invBoxSize);
 
           // if another box
@@ -332,14 +332,14 @@ local {
             // assert(MyDom.cells[dBoxIdx].count < MAXATOMS);
 
             // add to new box
-            MyDom.cells[dBoxIdx](1) += 1;
-            MyDom.cells[dBoxIdx](2)[MyDom.cells[dBoxIdx](1)] = box(2)[ii];
+            MyDom.cells[dBoxIdx].count += 1;
+            MyDom.cells[dBoxIdx].atoms[MyDom.cells[dBoxIdx].count] = box.atoms[ii];
 
             // remove from old box (copy the last atom in old box to ii)
-            const oldCount = box(1);
-            box(1) -= 1;
-            if(box(1)) then 
-              box(2)[ii] = box(2)[oldCount];
+            const oldCount = box.count;
+            box.count -= 1;
+            if(box.count) then 
+              box.atoms[ii] = box.atoms[oldCount];
 
             // decrement number of atoms if dest box not local
             if(!MyDom.localDom.member(dBoxIdx)) then MyDom.numLocalAtoms -= 1; 
@@ -364,9 +364,9 @@ proc gatherAtoms(const ref MyDom:Domain, const in face : int) : int(32) {
       var idx = getBoxFromCoords(a.r, MyDom.invBoxSize);
       ref box = MyDom.cells[idx];
       //assert(MyDom.halo.member(idx), MyDom.halo, " vs. ", idx);
-      ref count = box(1);
+      ref count = box.count;
       count += 1;
-      box(2)[count] = a;
+      box.atoms[count] = a;
       if MyDom.localDom.member(idx) then numLocalAtoms += 1;
     }
   }
@@ -384,9 +384,9 @@ proc haloExchange(const ref MyDom : Domain, const in face:int) {
   var counter = 1;
   local {
     for box in MyDom.cells[src] {
-      for i in 1..box(1) {
+      for i in 1..box.count {
         ref slot = pack[counter];
-        slot = box(2)(i);
+        slot = box.atoms(i);
         counter += 1;
       }
     }
@@ -599,8 +599,8 @@ local {
               // assert(MyDom.halo.member(box));
               // assert(MyDom.cells[box].count < MAXATOMS);
 
-              MyDom.cells[box](1) += 1;
-              MyDom.cells[box](2)[MyDom.cells[box](1)] = new Atom(gid, mass, 1 : int(32), (rx, ry, rz));
+              MyDom.cells[box].count += 1;
+              MyDom.cells[box].atoms[MyDom.cells[box].count] = new Atom(gid, mass, 1 : int(32), (rx, ry, rz));
               if(MyDom.localDom.member(box)) then MyDom.numLocalAtoms += 1; 
 
             }
@@ -626,7 +626,7 @@ tArray[timerEnum.COMMREDUCE].start();
       const MyDom = Grid[ijk];
       var maxOccTemp = 0;
       for box in MyDom.cells[MyDom.localDom] {
-        maxOccTemp = max(maxOccTemp, box(1));
+        maxOccTemp = max(maxOccTemp, box.count);
       }
       maxOcc = max(maxOccTemp, maxOcc);
     }
@@ -655,8 +655,8 @@ if useChplVis then tagVdebug("advanceVelocity");
       const MyDom = Grid[ijk];
 local {
       forall (box, f) in zip(MyDom.cells[MyDom.localDom], MyDom.f) {
-        for i in 1..box(1) {
-          ref a = box(2)(i);
+        for i in 1..box.count {
+          ref a = box.atoms(i);
           a.v += ((dt/a.mass)*f(i));
         }
       }
@@ -675,8 +675,8 @@ if useChplVis then tagVdebug("advancePosition");
       const MyDom = Grid[ijk];
 local {
       forall box in MyDom.cells[MyDom.localDom] {
-        for i in 1..box(1) {
-          ref a = box(2)(i);
+        for i in 1..box.count {
+          ref a = box.atoms(i);
           a.r += (dt*a.v);
         }
       }
