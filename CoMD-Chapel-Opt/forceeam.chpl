@@ -67,14 +67,14 @@ type RList = MAXATOMS*real;
 
 class EAMFaceArr {
   var d : domain(3);
-  var a : [d] RList;
+  var a : [d] [1..MAXATOMS] real;
 }
 
 class EAMDomain {
   var localDom  : domain(3);
   var halo      = localDom.expand(1);
   var dfEmbed   : [halo] RList;
-  var rhoBar    : [localDom] RList;
+  var rhoBar    : [localDom] [1..MAXATOMS] real;
   var neighDom  : domain(1) = {1..6};
   var neighs    : [neighDom] int3;
   //TODO: This temporary buffer was introduced to eliminate a spike during initial 
