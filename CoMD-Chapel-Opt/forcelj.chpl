@@ -57,17 +57,17 @@ if useChplVis then tagVdebug("computeLJForce");
         const force = MyDom.force : ForceLJ;
         const neighs = {-1..1, -1..1, -1..1};
         coforall (box, f, pe, boxIdx) in zip(MyDom.cells[MyDom.localDom], MyDom.f, MyDom.pe, MyDom.localDom) {
-          for i in 1..box(1) {
+          for i in 1..box.count {
             f(i)  = (0.0, 0.0, 0.0);
             pe(i) = 0.0;
           }
 
           for n in neighs {
             const ref nBox = MyDom.cells[boxIdx + n];
-            for i in 1..box(1) {
+            for i in 1..box.count {
               var fi:real3, pi:real;
-              for j in 1..nBox(1) {
-                force.compute(box(2)(i).r, nBox(2)(j).r, fi, pi);
+              for j in 1..nBox.count {
+                force.compute(box.atoms(i).r, nBox.atoms(j).r, fi, pi);
               }
               f(i)  += fi;
               pe(i) += pi;
@@ -88,17 +88,17 @@ if useChplVis then tagVdebug("computeLJForce");
 local {
         const neighs = {-1..1, -1..1, -1..1};
         coforall (box, f, pe, boxIdx) in zip(MyDom.cells[MyDom.localDom], MyDom.f, MyDom.pe, MyDom.localDom) {
-          for i in 1..box(1) {
+          for i in 1..box.count {
             f(i)  = (0.0, 0.0, 0.0);
             pe(i) = 0.0;
           }
 
           for n in neighs {
             const ref nBox = MyDom.cells[boxIdx + n];
-            for i in 1..box(1) {
+            for i in 1..box.count {
               var fi:real3, pi:real;
-              for j in 1..nBox(1) {
-                force.compute(box(2)(i).r, nBox(2)(j).r, fi, pi);
+              for j in 1..nBox.count {
+                force.compute(box.atoms(i).r, nBox.atoms(j).r, fi, pi);
               }
               f(i)  += fi;
               pe(i) += pi;

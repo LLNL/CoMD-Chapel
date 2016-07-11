@@ -1,4 +1,4 @@
-CHPL_FLAGS= --fast -suseBulkTransferStride -sdataParTasksPerLocale=5 -sdefaultDoRADOpt=true -sdisableAliasedBulkTransfer=false --conditional-dynamic-dispatch-limit=2
+CHPL_FLAGS= --fast -suseBulkTransferStride -sdataParTasksPerLocale=5 -sdefaultDoRADOpt=true -sdisableAliasedBulkTransfer=false --conditional-dynamic-dispatch-limit=2 -snoRefCount
 #CHPL_FLAGS= --fast --cache-remote -snoRefCount -suseBulkTransferStride -sdataParTasksPerLocale=5 -sdefaultDoRADOpt=true -sdisableAliasedBulkTransfer=false --conditional-dynamic-dispatch-limit=2
 
 SAVE_C_CODE= --savec ./c_code

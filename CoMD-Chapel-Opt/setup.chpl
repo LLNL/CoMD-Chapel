@@ -36,19 +36,11 @@ inline proc >=(const ref a : Atom, const ref b : Atom) : bool {
   return !(a < b);
 }
 
-type AtomList = MAXATOMS*Atom;
-type FList = MAXATOMS*real3;
-type PList = MAXATOMS*real;
-
 // link cell
-/*
 record Box {
   var count : int(32);
-  var atoms : AtomList;
+  var atoms : [1..MAXATOMS] Atom;
 }
-*/
-
-type Box = (int(32), AtomList);
 
 class FaceArr {
   var d : domain(3);
@@ -60,8 +52,8 @@ class Domain {
   var localDom       : domain(3);                          // local domain
   var halo           = localDom.expand(1);                 // expanded domain (local+halo)
   var cells          : [halo] Box;                         // cells in the expanded domain
-  var f              : [localDom] FList;                   // force per atom in local cells
-  var pe             : [localDom] PList;                   // potential energy per atom in local cells
+  var f              : [localDom] [1..MAXATOMS] real3;     // force per atom in local cells
+  var pe             : [localDom] [1..MAXATOMS] real;      // potential energy per atom in local cells
   var neighDom       : domain(1) = {1..6};                 // domain of neighbors on each face (xm, xp, ym, yp, zm, zp)
   var nM$, nP$       : sync bool;                          // sync updates to neighbors for each face pair (xm/xp, ym/yp, zm/zp)
   var neighs         : [neighDom] int3;                    // neighbors on each face (xm, xp, ym, yp, zm, zp)
