@@ -123,7 +123,7 @@ if useChplVis then tagVdebug("setupEAMForce");
     this.eamPot = new EAMPot();
     const boxSpace = {1..numBoxes(1), 1..numBoxes(2), 1..numBoxes(3)};
     const distSpace = boxSpace dmapped Block(boundingBox=boxSpace, targetLocales=locGrid);
-    var eamDom => this.eamPot.eamDom;
+    ref eamDom = this.eamPot.eamDom;
     coforall ijk in locDom {
       on locGrid[ijk] {
         const MyLocDom = distSpace._value.locDoms[ijk].myBlock;
@@ -134,13 +134,13 @@ if useChplVis then tagVdebug("setupEAMForce");
         const bSh = boxSpace.high;
 
 local {
-        const localDom => MyEAMDom.localDom;
-        const halo => MyEAMDom.halo;
-        const neighDom => MyEAMDom.neighDom;
-        var srcSlice => MyEAMDom.srcSlice;
-        var destSlice => MyEAMDom.destSlice;
-        var neighs => MyEAMDom.neighs;
-        // var temps => MyEAMDom.temps;
+        const ref localDom = MyEAMDom.localDom;
+        const ref halo = MyEAMDom.halo;
+        const ref neighDom = MyEAMDom.neighDom;
+        ref srcSlice = MyEAMDom.srcSlice;
+        ref destSlice = MyEAMDom.destSlice;
+        ref neighs = MyEAMDom.neighs;
+        // ref temps = MyEAMDom.temps;
 
         var xyz : [neighDom] int3;
         xyz[1] = (-1,0,0);
@@ -290,11 +290,11 @@ if useChplVis then pauseVdebug();
   }
 
   inline proc haloExchange(const ref MyEAMDom : EAMDomain, const ref eamDom : [] EAMDomain, const in face : int) {
-    const dest => MyEAMDom.destSlice;
-    const src => MyEAMDom.srcSlice;
+    const ref dest = MyEAMDom.destSlice;
+    const ref src = MyEAMDom.srcSlice;
     const nf = MyEAMDom.neighs[face];
-    var nDest => MyEAMDom.dfEmbed[dest[face]];
-    var nSrc => eamDom[nf].dfEmbed[src[face]];
+    ref nDest = MyEAMDom.dfEmbed[dest[face]];
+    ref nSrc = eamDom[nf].dfEmbed[src[face]];
 
     //this works
     //nDest = nSrc;
@@ -306,7 +306,7 @@ if useChplVis then pauseVdebug();
     /*
     on locGrid[nf] {
       const sf = src[face];
-      const ec => eamDom[nf].dfEmbed[sf];
+      const ref ec = eamDom[nf].dfEmbed[sf];
       nDest._value.doiBulkTransferStride(ec._value);
     }
     */
@@ -323,7 +323,7 @@ if useChplVis then pauseVdebug();
   proc exchangeData() {
     // halo exchange
     tArray[timerEnum.EAMHALO].start();
-    const eamDom => this.eamPot.eamDom;
+    const ref eamDom = this.eamPot.eamDom;
     for i in 1..6 by 2 {
       coforall ijk in locDom {
         on locGrid[ijk] {
@@ -358,7 +358,7 @@ if useChplVis then pauseVdebug();
   proc compute() : void {
     tArray[timerEnum.FORCE1].start();
 if useChplVis then tagVdebug("computeEAMForce");
-    const eamDom => this.eamPot.eamDom;
+    const ref eamDom = this.eamPot.eamDom;
     coforall ijk in locDom {
       on locGrid[ijk] {
         const MyDom = Grid[ijk];
@@ -428,7 +428,7 @@ if useChplVis then pauseVdebug();
   proc computeLocal() : void {
     tArray[timerEnum.FORCE1].start();
 if useChplVis then tagVdebug("computeEAMForce");
-    const eamDom => this.eamPot.eamDom;
+    const ref eamDom = this.eamPot.eamDom;
     coforall ijk in locDom {
       on locGrid[ijk] {
         const MyDom = Grid[ijk];
@@ -482,7 +482,7 @@ local {
         coforall (box, f, dfEmbed, boxIdx) in zip(MyDom.cells[MyDom.localDom], MyDom.f, MyEAMDom.dfEmbed[MyDom.localDom], MyDom.localDom) {
           for n in neighs {
             const ref nBox = MyDom.cells[boxIdx + n];
-            const nDfEmbed => MyEAMDom.dfEmbed[boxIdx + n];
+            const ref nDfEmbed = MyEAMDom.dfEmbed[boxIdx + n];
             for i in 1..box.count {
               var fij:real3;
               for j in 1..nBox.count {
