@@ -67,14 +67,14 @@ proc initGrid(latticeConstant: real, const ref force: Force) {
 
 local {
       // alias to save typing
-      const halo => MyDom.halo;
-      var destSlice => MyDom.destSlice;
-      var srcSlice => MyDom.srcSlice;
-      var neighs => MyDom.neighs;
-      const neighDom => MyDom.neighDom;
-      var temps1 => MyDom.temps1;
-      var temps2 => MyDom.temps2;
-      var pbc => MyDom.pbc;
+      const ref halo = MyDom.halo;
+      ref destSlice = MyDom.destSlice;
+      ref srcSlice = MyDom.srcSlice;
+      ref neighs = MyDom.neighs;
+      const ref neighDom = MyDom.neighDom;
+      ref temps1 = MyDom.temps1;
+      ref temps2 = MyDom.temps2;
+      ref pbc = MyDom.pbc;
       {
         const size0 = halo.dim(2).size * halo.dim(3).size;
         const size1 = halo.dim(1).size * halo.dim(3).size;
@@ -299,7 +299,7 @@ proc updateLinkCells() {
       const MyDom = Grid[ijk];
 local {
       // alias to save typing
-      const halo => MyDom.halo;
+      const ref halo = MyDom.halo;
       const neighDom = MyDom.neighDom;
       const invBoxSize = MyDom.invBoxSize;
  
@@ -375,8 +375,8 @@ proc gatherAtoms(const ref MyDom:Domain, const in face : int) : int(32) {
 
 proc haloExchange(const ref MyDom : Domain, const in face:int) {
   const src = MyDom.destSlice[face];
-  const neighs => MyDom.neighs;
-  var faceArr => MyDom.temps1[face].a;
+  const ref neighs = MyDom.neighs;
+  ref faceArr = MyDom.temps1[face].a;
   const nf = neighs[face];
   ref pack = MyDom.packBuf[face];
   const target = if face % 2 == 0 then face-1 else face+1;
@@ -423,8 +423,7 @@ proc exchangeData(const ref MyDom:Domain, const in i : int) {
 
 // if 2 or more cells in this dimension, then read 
 // and add atoms in parallel
-proc exchangeData(const ref MyDom:Domain, const in i : int) 
-            where MyDom.localDom.dim((i/2):int+1).size > 1 {
+proc exchangeDataTwo(const ref MyDom:Domain, const in i : int) {
   var nAtomsM : int(32) = 0;
   var nAtomsP : int(32) = 0;
   cobegin with (ref nAtomsM, ref nAtomsP) {
@@ -451,7 +450,11 @@ tArray[timerEnum.ATOMHALO].start();
   for i in 1..6 by 2 {
     coforall ijk in locDom {
       on locGrid[ijk] {
-        exchangeData(Grid[ijk], i);
+        if Grid[ijk].localDom.dim((i/2):int+1).size > 1 {
+          exchangeDataTwo(Grid[ijk], i);
+        } else {
+          exchangeData(Grid[ijk], i);
+        }
       }
     }
   }
