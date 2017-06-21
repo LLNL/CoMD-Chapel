@@ -1,5 +1,5 @@
-# --cache-remote -snoRefCount significantly speed up code with arrays
-CHPL_FLAGS= --fast --cache-remote -snoRefCount -sdefaultDoRADOpt=true -sdisableAliasedBulkTransfer=false --conditional-dynamic-dispatch-limit=2
+# --cache-remote significantly speed up code with arrays
+CHPL_FLAGS= --fast --cache-remote -sdefaultDoRADOpt=true -sdisableAliasedBulkTransfer=false --conditional-dynamic-dispatch-limit=2
 
 # This is extremely slow
 #CHPL_FLAGS= --fast -sdefaultDoRADOpt=true -sdisableAliasedBulkTransfer=false --conditional-dynamic-dispatch-limit=2
